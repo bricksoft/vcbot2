@@ -26,12 +26,12 @@ $ docker run \
 
 By attaching a volume you can provide your token in a config file like so:
 
-```json
+```json5
 {
-  "appid": "123456780ß", // not yet used
-  "pubkey": "e54768zrhwefsz9h2iqawdf9zhuqwre", // not yet used
-  "token": "abcdef123123.abcdef.abcdef1234abcdef12345",
-  "prefix": "vc!" // optional
+  appid: "123456780ß", // not yet used
+  pubkey: "e54768zrhwefsz9h2iqawdf9zhuqwre", // not yet used
+  token: "abcdef123123.abcdef.abcdef1234abcdef12345",
+  prefix: "vc!", // optional
 }
 ```
 
