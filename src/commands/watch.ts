@@ -15,11 +15,11 @@ export default class Watch extends Command {
   //     return "Pong!";
   //   },
   // };
-  execute = (message: Message, args: string[]) => {
+  execute = async (message: Message, args: string[]) => {
     if (args.length === 1) {
       const channel = message.guild.channels.resolve(args[0]);
       if (channel && channel.type === "voice") {
-        this.client.watcher.watch(channel.id);
+        await this.client.watcher.addChannel(message.guild.id, channel.id);
         return message.reply(`now watching channel <#${channel.id}>`);
       }
     }

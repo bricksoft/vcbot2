@@ -16,11 +16,11 @@ export default class AddRole extends Command {
   //     return "Pong!";
   //   },
   // };
-  execute = (message: Message, args: string[]) => {
+  execute = async (message: Message, args: string[]) => {
     if (args.length === 1) {
       const role = message.guild.roles.resolve(args[0]);
       if (role) {
-        this.client.watcher.addRoles(role.id);
+        await this.client.watcher.addRoles(message.guild.id, role.id);
         return message.reply(
           `I will add/remove the role <@&${role.id}> from now on!`
         );

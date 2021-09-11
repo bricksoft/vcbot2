@@ -1,9 +1,9 @@
 // import { Interaction } from "discord.js";
 import {
-  EmbedField,
-  EmbedFieldData,
+  // EmbedField,
+  // EmbedFieldData,
   MessageEmbed,
-  PermissionObject,
+  // PermissionObject,
 } from "discord.js";
 import { Command, /* CommandInteraction, */ Message } from "../util/command";
 
@@ -30,6 +30,7 @@ export default class Help extends Command {
         )
       : false;
 
+    // TODO API change in djs v13 (embed)
     message.reply(
       new MessageEmbed({
         title: `${this.client.user.username} Help ${

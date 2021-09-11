@@ -28,6 +28,15 @@ export class ECLFAIL extends Error {
   }
 }
 
+export class EPERMFAIL extends Error {
+  constructor(command: string, message: string, capture: boolean = false) {
+    super(`failed to execute command '${command}': ${message}`);
+    this.name = "EPERMFAIL";
+    if (capture) {
+      Error.captureStackTrace(this, EPERMFAIL);
+    }
+  }
+}
 export class ECMDFAIL extends Error {
   constructor(command: string, error: Error, capture: boolean = false) {
     super(`failed to execute command '${command}': ${error.message}`);

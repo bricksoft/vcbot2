@@ -1,13 +1,13 @@
 import {
   Client,
   Collection /* Interaction */,
-  PermissionFlags,
   PermissionString,
 } from "discord.js";
 import { DiscordInteractions } from "slash-commands";
+import { BotCredentials } from "./bot";
 import commands from "./commands";
 import { Command, Message } from "./util/command";
-import { ECMDFAIL } from "./util/error";
+import { ECMDFAIL, EPERMFAIL } from "./util/error";
 
 export class CommandHandler {
   private replies = new Collection<string, Message[]>();
@@ -25,7 +25,7 @@ export class CommandHandler {
       applicationId,
       token,
       publicKey,
-    }: { applicationId: string; token: string; publicKey: string }
+    }: BotCredentials
   ) {
     this.#commands = commands(this.client);
     this.interaction = new DiscordInteractions({
@@ -63,16 +63,25 @@ export class CommandHandler {
 
     try {
       const cmd = this.#commands.get(command.replace(this.prefix, ""));
-
-      if (
-        Object.keys(cmd.permissions)
-          .map((k) => {
-            if (cmd.permissions[k]) {
-              return !message.member.permissions.has(k as PermissionString);
-            } else return false;
-          })
-          .find((p) => p)
-      ) {
+      const missingPerms = Object.keys(cmd.permissions)
+        .map((k) => {
+          if (
+            cmd.permissions[k] &&
+            !message.member.permissions.has(k as PermissionString)
+          ) {
+            return k;
+          }
+        })
+        .filter((p) => typeof p !== "undefined");
+      if (missingPerms.length) {
+        console.log(
+          new EPERMFAIL(
+            command,
+            `user ${message.member.id}(${
+              message.member.nickname
+            }) missing permission(s): ${missingPerms.join(", ")}`
+          )
+        );
         return false;
       }
       const result = await cmd.execute(message, args);

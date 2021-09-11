@@ -1,46 +1,47 @@
-import { Client, Collection, VoiceChannel, VoiceState } from "discord.js";
-import { writeFileSync, accessSync, statSync, mkdirSync } from "fs";
+import { Client, VoiceChannel, VoiceState } from "discord.js";
+import { writeFile, stat, mkdir } from "fs/promises";
 import { dirname } from "path";
+import { GuildConfig } from "./guildConfig";
 
 export class ChannelWatchList {
-  // #channels = new Set<VoiceChannel>();
-  #channels = new Set<string>();
-  #roles = new Set<string>();
-  // #ready: Promise<void> = Promise.resolve();
-
-  public get channels() {
-    return this.#channels;
-  }
-
-  public get roles() {
-    return this.#roles;
-  }
-
+  #config = new GuildConfig();
+  
   constructor(
-    private client: Client,
-    private file: string,
-    channels: (string | VoiceChannel)[] | Set<string | VoiceChannel> = [],
-    roles: string[] = []
+    client: Client,
+    private file: string
   ) {
     // this.#ready = this.watch(...channels);
-    const { channels: _channels, roles: _roles } = this.parse();
-
-    this.addRoles(...new Set([...roles, ..._roles])).then(() =>
-      this.watch(...new Set([...channels, ..._channels]))
+    /*  const { channels: _channels, roles: _roles } =  */
+    this.parse();
+    // this.#channels.merge(channels);
+    // this.#roles.merge(roles);
+    this.serialize();
+    
+    client.on(
+      "voiceStateUpdate",
+      this.onVoiceStateChange.bind(this)
     );
   }
 
   private parse() {
-    let channels = [];
-    let roles = [];
     try {
       const config = require(this.file);
-      if (config.channels && Array.isArray(config.channels))
-        channels = config.channels;
+      
+      if(config && "guilds" in config){
+        const guilds: ([string, {channels: string[],roles: string[]}])[] = config.guilds;
 
-      if (config.roles && Array.isArray(config.roles)) roles = config.roles;
+        if(Array.isArray(guilds) && guilds.length){
+          guilds.forEach(([id, { channels, roles }]) => {
+            this.#config.set(id as string, { channels: new Set(channels || []), roles: new Set(roles || []) });
+          });
+        }
+      }
     } catch (error) {}
-    return { channels, roles };
+
+    // this.mergeRoles(roles.merge(_roles)).then(()=>{
+    //   this.mergeChannels(channels.merge(_channels));
+    // });
+    // return { channels, roles };
   }
 
   // private async resolveChannels(
@@ -59,71 +60,93 @@ export class ChannelWatchList {
   // }
 
   private async serialize() {
+    await mkdir(dirname(this.file),{ recursive:true });
     const json = JSON.stringify({
-      channels: [...this.#channels] /* .map((c) => c.id) */,
-      roles: [...this.#roles],
+      guilds: [...this.#config.keys()].map<[string, {channels:string[], roles:string[]}]>(k => {
+        const config = this.#config.get(k);
+        return [k, {
+          channels: [...config.channels],
+          roles: [...config.roles]
+        }];
+      })
     });
-    const statDir = statSync(dirname(this.file));
+    const statDir = await stat(dirname(this.file));
 
     if (!statDir.isDirectory()) {
-      mkdirSync(dirname(this.file));
+      await mkdir(dirname(this.file));
     }
-    writeFileSync(this.file, json);
+    await writeFile(this.file, json);
   }
 
-  // public async ready() {
-  //   await this.#ready;
-  // }
-
-  public async watch(...channels: (VoiceChannel | string)[]) {
+  public async addChannel(guild:string, ...channels: (VoiceChannel | string)[]) {
     // const add = await this.resolveChannels(channels);
+    const config = this.#config.get(guild);
+
     channels.forEach((channel) =>
-      this.#channels.add(typeof channel === "string" ? channel : channel.id)
+      config.channels.add(typeof channel === "string" ? channel : channel.id)
     );
+
+    this.#config.set(guild, config);
     await this.serialize();
+    return [...config.channels]
   }
 
-  public async unwatch(...channels: (VoiceChannel | string)[]) {
+  public async removeChannel(guild:string, ...channels: (VoiceChannel | string)[]) {
     // const remove = await this.resolveChannels(channels);
-    channels.forEach((channel) =>
-      this.#channels.delete(typeof channel === "string" ? channel : channel.id)
-    );
+    const config = this.#config.get(guild);
+    const result = channels.map<[string, boolean]>(channel => {
+      const id = typeof channel === "string" ? channel : channel.id; 
+      return [id, config.channels.delete(id)]
+    });
+
+    this.#config.set(guild, config);
     await this.serialize();
+    return result;
   }
 
-  public async addRoles(...roles: string[]) {
-    roles.forEach((role) => this.#roles.add(role));
+  public async addRoles(guild:string, ...roles: string[]) {
+    const config = this.#config.get(guild);
+    
+    roles.forEach(role => config.roles.add(role));
+    this.#config.set(guild, config);
     await this.serialize();
+    return [...config.roles]
+  }
+  
+  public async removeRoles(guild:string, ...roles: string[]) {
+    const config = this.#config.get(guild);
+    const result = roles.map<[string, boolean]>(role => { 
+      return [role, config.roles.delete(role)]
+    });
+    
+    this.#config.set(guild, config);
+    await this.serialize();
+    return result;
   }
 
-  public async removeRoles(...roles: string[]) {
-    roles.forEach((role) => this.#roles.delete(role));
-    await this.serialize();
-  }
+  public onVoiceStateChange(_oldState: VoiceState, newState: VoiceState) {
+    const guild = newState.guild.id;
+    const config = this.#config.get(guild);
 
-  public handleVoiceStateChange(_oldState: VoiceState, newState: VoiceState) {
-    const watchedChannels = [...this.#channels];
-    const watcherRoles = [...this.#roles];
-
-    if (!watchedChannels.length) return;
+    if (!config.channels.size) return;
 
     try {
       // user joins a watched voice channel
       if (
         newState.channelID !== null &&
-        watchedChannels.includes(newState.channelID)
+        config.channels.has(newState.channelID)
       ) {
         // console.log("adding roles: %o", watcherRoles);
-        newState.member.roles.add(watcherRoles);
+        newState.member.roles.add([...config.roles]);
       }
 
       // user leaves a watched voice channel
       else if (
         newState.channelID === null ||
-        !watchedChannels.includes(newState.channelID)
+        !config.channels.has(newState.channelID)
       ) {
         // console.log("removing roles: %o", watcherRoles);
-        newState.member.roles.remove(watcherRoles);
+        newState.member.roles.remove([...config.roles]);
       }
     } catch (error) {
       console.error(error);

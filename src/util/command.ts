@@ -1,7 +1,5 @@
 import {
   Message,
-  Client,
-  PermissionFlags,
   PermissionObject,
   // Interaction,
   // APIMessage,
@@ -10,9 +8,9 @@ import {
   // Collection,
   // CommandInteractionOption,
 } from "discord.js";
-import { PartialApplicationCommand } from "slash-commands";
+// import { PartialApplicationCommand } from "slash-commands";
 import { CustomClient } from "../bot";
-import { ChannelWatchList } from "./watcher";
+// import { ChannelWatchList } from "./watcher";
 
 // export type CommandInteraction = Omit<PartialApplicationCommand, "options"> & {
 //   options?: Collection<string, CommandInteractionOption>;

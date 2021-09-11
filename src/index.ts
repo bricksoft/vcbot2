@@ -1,6 +1,5 @@
-import config from "./config";
+import config, { dataDir } from "./config";
 import Bot, { Options } from "./bot";
-import { join } from "path";
 
 export default (
   options: Omit<Options, "intents"> = {},
@@ -13,6 +12,6 @@ export default (
       publicKey: config.pubkey,
     },
     prefix,
-    join(__dirname, "../config"),
-    { /* intents: ["GUILD_MEMBERS"], */ ...options }
+    dataDir,
+    { /* intents: ["GUILD_MEMBERS"], */ ...options } // TODO add Intents with djs 13
   );

@@ -1,4 +1,4 @@
-FROM node:14 as build
+FROM node:16 as build
 # Create app directory
 ENV NODE_ENV=production
 WORKDIR /build
@@ -9,13 +9,14 @@ COPY index.ts ./
 COPY src ./src
 RUN yarn --production=false && yarn build
 
-FROM node:14
-ENV NODE_ENV=production
+FROM node:16
+ENV NODE_ENV=production SUPPRESS_NO_CONFIG_WARNING=true NODE_CONFIG_DIR=/config:/app/config DATA_DIR=/config
 WORKDIR /app
 COPY --from=build /build/dist .
 COPY package.json ./
 COPY yarn.lock ./
-RUN yarn --production=true
+COPY config/custom-environment-variables.json ./config/
+COPY config/default.json ./config/
+RUN yarn
 CMD ["node", "index.js"]
-
-VOLUME /app/config
+VOLUME /config

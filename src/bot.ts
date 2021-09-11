@@ -1,8 +1,9 @@
-import { Client, ClientOptions, GuildMember, VoiceState } from "discord.js";
+import { Client, ClientOptions } from "discord.js";
 import { join } from "path";
 import { CommandHandler } from "./commandhandler";
 import { ECLFAIL } from "./util/error";
 import { ChannelWatchList } from "./util/watcher";
+import { dataDir as DATA_DIR } from "./config";
 
 export { ClientOptions as Options } from "discord.js";
 
@@ -23,7 +24,7 @@ export default class Bot {
   constructor(
     credentials: BotCredentials,
     prefix = "!",
-    configDir: string = join(__dirname, "../config"),
+    dataDir = DATA_DIR,
     options?: ClientOptions
   ) {
     this.client = new Client(options) as CustomClient;
@@ -31,28 +32,38 @@ export default class Bot {
     this.client.handler = new CommandHandler(this.client, prefix, credentials);
     this.client.watcher = new ChannelWatchList(
       this.client,
-      join(configDir, "watchlist.json")
+      join(dataDir, "watchlist.json")
     );
     this.client
       .login(credentials.token)
-      .then(this.onReady.bind(this.client))
+      .then(this.onLogin.bind(this.client))
       .catch(this.onLoginErr.bind(this.client));
-    this.client.on(
-      "voiceStateUpdate",
-      this.client.watcher.handleVoiceStateChange.bind(this.client.watcher)
-    );
+
     this.client.on("ready", async () => {
-      this.onLogin(this.client);
+      await this.setPresence(prefix);
+      this.onReady(this.client);
 
       // TODO wait for discord.js v13
       // this.registerCommands(this.handler);
     });
   }
-  protected onReady(this: Client) {
-    console.log("ready [%s]", this.readyTimestamp);
+
+  protected async setPresence(prefix: string) {
+    await this.client.user.setPresence({
+      status: "online",
+      activity: {
+        name: `${prefix}help`,
+        type: "LISTENING",
+      },
+      afk: false,
+    });
   }
-  protected onLogin(client: Client) {
-    console.log(`Successfully logged in as ${client.user.tag}`);
+
+  protected onReady(client: Client) {
+    console.log("ready [%s]", client.readyTimestamp);
+  }
+  protected onLogin(this: Client) {
+    console.log(`Successfully logged in as ${this.user.tag}`);
   }
   protected onLoginErr(this: Client, err: Error) {
     throw new ECLFAIL(err.message);
